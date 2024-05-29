@@ -1,7 +1,3 @@
-Here's a README for your "Testify" repository:
-
----
-
 # Testify
 
 Testify is a simple and effective C testing framework designed to help you manage and run tests with clear and concise reporting. This repository includes utilities for running tests on your C code, ensuring your assertions and test cases are handled efficiently.
@@ -25,7 +21,7 @@ Testify is a simple and effective C testing framework designed to help you manag
 
 Here is an example of the output you can expect when running Testify:
 
-![Testify screenshot](https://github.com/conorgolden1/testify/blob/master/screenshots/output.png?raw=true)
+![Testify screenshot](https://github.com/conorgolden1/testify/blob/main/screenshots/output.png?raw=true)
 
 ## How to Use
 
@@ -52,7 +48,3 @@ Contributions are welcome! Please fork the repository and submit a pull request 
 ## License
 
 This project is licensed under the MIT License.
-
----
-
-Feel free to customize this README to better fit your needs and preferences.
