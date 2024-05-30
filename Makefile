@@ -13,5 +13,5 @@ $(BUILD_DIR)/$(TARGET):
 
 $(TARGET): $(BUILD_DIR)/$(TARGET)
 	@echo "Running test_runner"
-	cd ../ && build/tests/$(TARGET) $(SRC_DIRS)
+	cd ../ && build/tests/$(TARGET) $(TEST_DIRS)
 

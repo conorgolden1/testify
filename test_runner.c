@@ -16,15 +16,15 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define SRC_DIR "src"
 #define BUILD_LIB_DIR "build/lib"
 #define BUILD_DIR "build/tests/"
 #define TEST_PREFIX ""
 #define TEST_POSTFIX ".c"
 #define TEST_UTILS "../../testify/"
-#define RUNNER_FILENAME BUILD_DIR "runner.c"
-#define RUNNER_EXECUTABLE BUILD_DIR "runner"
+#define RUNNER_FILENAME "runner.c"
+#define RUNNER_EXECUTABLE "runner"
 #define MAX_FUNCTIONS 100
+#define MAX_PATH_LEN 1024
 
 int string_ends_with(const char *str, const char *suffix) {
   int str_len = strlen(str);
@@ -32,6 +32,96 @@ int string_ends_with(const char *str, const char *suffix) {
 
   return (str_len >= suffix_len) &&
          (0 == strcmp(str + (str_len - suffix_len), suffix));
+}
+
+char *remove_extension(const char *path) {
+  char *result = (char *)malloc(strlen(path) + 1);
+  if (!result) {
+    fprintf(stderr, "Memory allocation failed\n");
+    exit(1);
+  }
+  strcpy(result, path);
+  char *dot = strrchr(result, '.');
+  if (dot != NULL) {
+    *dot = '\0';
+  }
+  return result;
+}
+
+char *get_filename_without_extension(const char *path) {
+  const char *last_slash = strrchr(path, '/');
+  const char *filename_start = last_slash ? last_slash + 1 : path;
+  char *filename = (char *)malloc(strlen(filename_start) + 1);
+  if (!filename) {
+    fprintf(stderr, "Memory allocation failed\n");
+    exit(1);
+  }
+  strcpy(filename, filename_start);
+  char *dot = strrchr(filename, '.');
+  if (dot != NULL) {
+    *dot = '\0';
+  }
+  return filename;
+}
+
+char *resolve_include_path(const char *base_path, const char *include_path) {
+  char *resolved_path = (char *)malloc(MAX_PATH_LEN);
+  if (!resolved_path) {
+    fprintf(stderr, "Memory allocation failed\n");
+    exit(1);
+  }
+
+  // Copy the base path and remove the filename to get the directory
+  strncpy(resolved_path, base_path, MAX_PATH_LEN);
+  resolved_path[MAX_PATH_LEN - 1] = '\0'; // Ensure null termination
+  char *last_slash = strrchr(resolved_path, '/');
+  if (last_slash != NULL) {
+    *last_slash = '\0';
+  }
+
+  // Concatenate the include path to the base directory
+  strncat(resolved_path, "/", MAX_PATH_LEN - strlen(resolved_path) - 1);
+  strncat(resolved_path, include_path,
+          MAX_PATH_LEN - strlen(resolved_path) - 1);
+
+  // Normalize the path (handle "../" and "./")
+  char *normalized_path = (char *)malloc(MAX_PATH_LEN);
+  if (!normalized_path) {
+    fprintf(stderr, "Memory allocation failed\n");
+    free(resolved_path);
+    exit(1);
+  }
+
+  char *token;
+  char *rest = resolved_path;
+  int len = 0;
+
+  while ((token = strtok_r(rest, "/", &rest))) {
+    if (strcmp(token, "..") == 0) {
+      // Go up one directory
+      if (len > 0) {
+        len--;
+        while (len > 0 && normalized_path[len] != '/') {
+          len--;
+        }
+        if (len > 0) {
+          normalized_path[len] = '\0';
+        }
+      }
+    } else if (strcmp(token, ".") != 0) {
+      // Normal directory name
+      if (len > 0) {
+        normalized_path[len++] = '/';
+      }
+      strcpy(&normalized_path[len], token);
+      len += strlen(token);
+    }
+  }
+  normalized_path[len] = '\0';
+
+  free(resolved_path);
+
+  return normalized_path;
 }
 
 void find_test_functions(const char *test_file,
@@ -76,6 +166,7 @@ void find_includes(const char *test_file, char includes[MAX_FUNCTIONS][256],
       sscanf(line, "#include %s", includes[*num_includes]);
       // Remove the trailing newline or any quotes/angle brackets
       includes[*num_includes][strcspn(includes[*num_includes], "\n")] = 0;
+      includes[*num_includes][0] = '/';
       (*num_includes)++;
     }
   }
@@ -83,8 +174,9 @@ void find_includes(const char *test_file, char includes[MAX_FUNCTIONS][256],
   fclose(file);
 }
 
-void generate_runner(const char *test_file) {
-  FILE *runner = fopen(RUNNER_FILENAME, "w");
+void generate_runner(const char *test_file, char includes[MAX_FUNCTIONS][256],
+                     int num_includes) {
+  FILE *runner = fopen(BUILD_DIR RUNNER_FILENAME, "w");
   if (runner == NULL) {
     perror("fopen");
     exit(EXIT_FAILURE);
@@ -94,14 +186,11 @@ void generate_runner(const char *test_file) {
   int num_functions;
   find_test_functions(test_file, functions, &num_functions);
 
-  char includes[MAX_FUNCTIONS][256];
-  int num_includes;
-  find_includes(test_file, includes, &num_includes);
-
   fprintf(runner, "#include <stdio.h>\n");
   for (int i = 0; i < num_includes; i++) {
-    includes[i][0] = '/';
-    fprintf(runner, "#include \"..%s\n", includes[i]);
+    char *path = resolve_include_path(test_file, includes[i]);
+    fprintf(runner, "#include \"../../%s\n", path);
+    free(path);
   }
   fprintf(runner, "int test_assertions = 0;\n");
   fprintf(runner, "int test_failures = 0;\n");
@@ -112,7 +201,6 @@ void generate_runner(const char *test_file) {
   fprintf(runner, "    #pragma GCC diagnostic push\n");
   fprintf(runner, "    #pragma GCC diagnostic ignored "
                   "\"-Wimplicit-function-declaration\"\n");
-  // Write function calls
   for (int i = 0; i < num_functions; i++) {
     fprintf(runner, "    _start_test(\"%s\");\n", functions[i]);
     fprintf(runner, "    %s();\n", functions[i]);
@@ -136,20 +224,50 @@ void generate_runner(const char *test_file) {
   fclose(runner);
 }
 
-void compile_and_run(const char *test_file) {
+void compile_and_run(const char *test_file, char includes[MAX_FUNCTIONS][256],
+                     int num_includes) {
   char compile_cmd[2048];
-  snprintf(compile_cmd, sizeof(compile_cmd),
-           "gcc -c ./testify/test_assert.c -o %stest_assert.o", BUILD_DIR);
-  printf("%s\n", compile_cmd);
-  system(compile_cmd);
-
-  snprintf(compile_cmd, sizeof(compile_cmd), "gcc  -I. -c %s -o %stest_file.o",
-           test_file, BUILD_DIR);
-  printf("%s\n", compile_cmd);
-
-  system(compile_cmd);
-
   char object_files[1024] = "";
+
+  // Create the Makefile path
+  char makefile_path[512];
+  snprintf(makefile_path, sizeof(makefile_path), "%sMakefile", BUILD_DIR);
+
+  // Open the Makefile for writing
+  FILE *makefile = fopen(makefile_path, "w");
+  if (makefile == NULL) {
+    perror("Failed to create Makefile");
+    return;
+  }
+
+  // Write the initial part of the Makefile
+  fprintf(makefile, "CC=gcc\nCFLAGS=-Wall -Wextra -std=c11\n\n");
+  fprintf(makefile, "all:\n");
+  fprintf(makefile, "\t@pwd\n");
+  // Compile the included files
+  for (int i = 0; i < num_includes; i++) {
+    char *path = resolve_include_path(test_file, includes[i]);
+    char *no_ext = remove_extension(path);
+    char *filename = get_filename_without_extension(path);
+
+    snprintf(compile_cmd, sizeof(compile_cmd), "\t$(CC) -c ../../%s.c -o %s.o\n",
+             no_ext,  filename);
+    fprintf(makefile, "%s", compile_cmd);
+    snprintf(compile_cmd, sizeof(compile_cmd), "%s.o ", filename);
+    strcat(object_files, compile_cmd);
+
+    free(no_ext);
+    free(filename);
+    free(path);
+  }
+
+  // Compile the test file
+  snprintf(compile_cmd, sizeof(compile_cmd), "\t$(CC) -c ../../%s -o test_file.o\n",
+           test_file);
+  fprintf(makefile, "%s", compile_cmd);
+  strcat(object_files, "test_file.o ");
+
+  // Compile the object files in the build/lib directory
   struct dirent *entry;
   DIR *lib_dir = opendir(BUILD_LIB_DIR);
   if (lib_dir) {
@@ -165,26 +283,37 @@ void compile_and_run(const char *test_file) {
     closedir(lib_dir);
   }
 
-  snprintf(
-      compile_cmd, sizeof(compile_cmd),
-      "gcc -Wl,--defsym=main=test_main -I. %stest_file.o %stest_assert.o %s "
-      "%s -o %s",
-      BUILD_DIR, BUILD_DIR, object_files, RUNNER_FILENAME, RUNNER_EXECUTABLE);
-  printf("%s\n", compile_cmd);
+  // Link all the object files
+  snprintf(compile_cmd, sizeof(compile_cmd),
+           "\t$(CC) -Wl,--defsym=main=test_main  %s %s -o %s\n", object_files,
+           RUNNER_FILENAME, RUNNER_EXECUTABLE);
+  fprintf(makefile, "%s", compile_cmd);
 
-  if (system(compile_cmd) != 0) {
+  // Running the tests
+  fprintf(makefile, "\t./%s\n", RUNNER_EXECUTABLE);
+
+  // Close the Makefile
+  fclose(makefile);
+
+  // Run the make command in the BUILD_DIR
+  char make_command[512];
+  snprintf(make_command, sizeof(make_command), "make -C %s", BUILD_DIR);
+  printf("%s\n", make_command);
+  if (system(make_command) != 0) {
     fprintf(stderr, "Compilation failed\n");
     return;
   }
 
-  printf("Running tests in %s\n", test_file);
-  printf("./%s\n", RUNNER_EXECUTABLE);
-  if (system("./" RUNNER_EXECUTABLE) != 0) {
-    fprintf(stderr, "Tests failed\n");
-    return;
-  }
+  // // Run the tests
+  // char runner_command[512];
+  // snprintf(runner_command, sizeof(runner_command), "./%s%s", BUILD_DIR,
+  // RUNNER_EXECUTABLE); printf("Running tests in %s\n", test_file);
+  // printf("%s\n", runner_command);
+  // if (system(runner_command) != 0) {
+  //     fprintf(stderr, "Tests failed\n");
+  //     return;
+  // }
 }
-
 int main(int argc, char *argv[]) {
   DIR *dir;
   struct dirent *entry;
@@ -209,9 +338,11 @@ int main(int argc, char *argv[]) {
         char test_file_path[512];
         snprintf(test_file_path, sizeof(test_file_path), "%s/%s", argv[i],
                  entry->d_name);
-
-        generate_runner(test_file_path);
-        compile_and_run(test_file_path);
+        char includes[MAX_FUNCTIONS][256];
+        int num_includes;
+        find_includes(test_file_path, includes, &num_includes);
+        generate_runner(test_file_path, includes, num_includes);
+        compile_and_run(test_file_path, includes, num_includes);
       }
     }
   }
