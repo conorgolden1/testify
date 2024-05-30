@@ -16,12 +16,12 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define SRC_DIR "tests"
+#define SRC_DIR "src"
 #define BUILD_LIB_DIR "build/lib"
 #define BUILD_DIR "build/tests/"
 #define TEST_PREFIX ""
 #define TEST_POSTFIX ".c"
-#define TEST_UTILS "../../.test_utils/"
+#define TEST_UTILS "../../testify/"
 #define RUNNER_FILENAME BUILD_DIR "runner.c"
 #define RUNNER_EXECUTABLE BUILD_DIR "runner"
 #define MAX_FUNCTIONS 100
@@ -37,6 +37,7 @@ int string_ends_with(const char *str, const char *suffix) {
 void find_test_functions(const char *test_file,
                          char functions[MAX_FUNCTIONS][256],
                          int *num_functions) {
+  printf("Searching test functions:\t%s\n", test_file);
   FILE *file = fopen(test_file, "r");
   if (!file) {
     perror("fopen");
@@ -137,7 +138,7 @@ void generate_runner(const char *test_file) {
 void compile_and_run(const char *test_file) {
   char compile_cmd[2048];
   snprintf(compile_cmd, sizeof(compile_cmd),
-           "gcc -c ./.test_utils/test_assert.c -o %stest_assert.o", BUILD_DIR);
+           "gcc -c ./testify/test_assert.c -o %stest_assert.o", BUILD_DIR);
   system(compile_cmd);
 
   snprintf(compile_cmd, sizeof(compile_cmd),
@@ -176,12 +177,16 @@ void compile_and_run(const char *test_file) {
   }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
   DIR *dir;
   struct dirent *entry;
 
-  if ((dir = opendir(SRC_DIR)) == NULL) {
-    perror("opendir");
+  if (argc < 2) {
+    fprintf(stderr, "Usage: export SRC_DIR in makefile that calls testify makefile\n");
+    exit(EXIT_FAILURE);
+  }
+  if ((dir = opendir(argv[1])) == NULL) {
+    perror(argv[1]);
     exit(EXIT_FAILURE);
   }
 
@@ -191,7 +196,7 @@ int main() {
     if (strncmp(entry->d_name, TEST_PREFIX, strlen(TEST_PREFIX)) == 0 &&
         string_ends_with(entry->d_name, ".c")) {
       char test_file_path[512];
-      snprintf(test_file_path, sizeof(test_file_path), "%s/%s", SRC_DIR,
+      snprintf(test_file_path, sizeof(test_file_path), "%s/%s", argv[1],
                entry->d_name);
 
       generate_runner(test_file_path);
