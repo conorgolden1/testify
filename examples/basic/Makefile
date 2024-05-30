@@ -1,7 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11 -I.
 TARGET = build/main
-SRC_DIR = src
 
 .PHONY: all clean run
 
@@ -17,6 +16,7 @@ clean:
 run: all
 	./$(TARGET)
 
-export SRC_DIR
+SRC_DIRS := src
+export SRC_DIRS
 test:
 	cd testify && $(MAKE)

@@ -139,14 +139,12 @@ void generate_runner(const char *test_file) {
 void compile_and_run(const char *test_file) {
   char compile_cmd[2048];
   snprintf(compile_cmd, sizeof(compile_cmd),
-           "gcc -c ./testify/test_assert.c -o %stest_assert.o",
-           BUILD_DIR);
+           "gcc -c ./testify/test_assert.c -o %stest_assert.o", BUILD_DIR);
   printf("%s\n", compile_cmd);
   system(compile_cmd);
 
-  snprintf(compile_cmd, sizeof(compile_cmd),
-           "gcc  -I. -c %s -o %stest_file.o", test_file,
-           BUILD_DIR);
+  snprintf(compile_cmd, sizeof(compile_cmd), "gcc  -I. -c %s -o %stest_file.o",
+           test_file, BUILD_DIR);
   printf("%s\n", compile_cmd);
 
   system(compile_cmd);
@@ -167,11 +165,11 @@ void compile_and_run(const char *test_file) {
     closedir(lib_dir);
   }
 
-  snprintf(compile_cmd, sizeof(compile_cmd),
-           "gcc -Wl,--defsym=main=test_main -I. %stest_file.o %stest_assert.o %s "
-           "%s -o %s",
-           BUILD_DIR, BUILD_DIR, object_files, RUNNER_FILENAME,
-           RUNNER_EXECUTABLE);
+  snprintf(
+      compile_cmd, sizeof(compile_cmd),
+      "gcc -Wl,--defsym=main=test_main -I. %stest_file.o %stest_assert.o %s "
+      "%s -o %s",
+      BUILD_DIR, BUILD_DIR, object_files, RUNNER_FILENAME, RUNNER_EXECUTABLE);
   printf("%s\n", compile_cmd);
 
   if (system(compile_cmd) != 0) {
@@ -193,28 +191,30 @@ int main(int argc, char *argv[]) {
 
   if (argc < 2) {
     fprintf(stderr,
-            "Usage: export SRC_DIR in makefile that calls testify makefile\n");
-    exit(EXIT_FAILURE);
-  }
-  if ((dir = opendir(argv[1])) == NULL) {
-    perror(argv[1]);
+            "Usage: export SRC_DIRS in makefile that calls testify makefile\n");
     exit(EXIT_FAILURE);
   }
 
-  mkdir(BUILD_DIR, 0777);
+  for (int i = 1; i < argc; i++) {
+    if ((dir = opendir(argv[i])) == NULL) {
+      perror(argv[i]);
+      continue;
+    }
 
-  while ((entry = readdir(dir)) != NULL) {
-    if (strncmp(entry->d_name, TEST_PREFIX, strlen(TEST_PREFIX)) == 0 &&
-        string_ends_with(entry->d_name, ".c")) {
-      char test_file_path[512];
-      snprintf(test_file_path, sizeof(test_file_path), "%s/%s", argv[1],
-               entry->d_name);
+    mkdir(BUILD_DIR, 0777);
 
-      generate_runner(test_file_path);
-      compile_and_run(test_file_path);
+    while ((entry = readdir(dir)) != NULL) {
+      if (strncmp(entry->d_name, TEST_PREFIX, strlen(TEST_PREFIX)) == 0 &&
+          string_ends_with(entry->d_name, ".c")) {
+        char test_file_path[512];
+        snprintf(test_file_path, sizeof(test_file_path), "%s/%s", argv[i],
+                 entry->d_name);
+
+        generate_runner(test_file_path);
+        compile_and_run(test_file_path);
+      }
     }
   }
-
   closedir(dir);
   return 0;
 }
