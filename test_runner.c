@@ -121,7 +121,8 @@ void generate_runner(const char *test_file) {
 
   fprintf(runner, "    #pragma GCC diagnostic pop\n");
   fprintf(runner, "}\n\n");
-  fprintf(runner, "int main() {\n");
+
+  fprintf(runner, "int test_main() {\n");
   /* line where GCC complains about implicit function declaration */
   fprintf(runner, "    run_all_tests();\n");
   fprintf(runner, "    #pragma GCC diagnostic push\n");
@@ -138,11 +139,16 @@ void generate_runner(const char *test_file) {
 void compile_and_run(const char *test_file) {
   char compile_cmd[2048];
   snprintf(compile_cmd, sizeof(compile_cmd),
-           "gcc -c ./testify/test_assert.c -o %stest_assert.o", BUILD_DIR);
+           "gcc -c ./testify/test_assert.c -o %stest_assert.o",
+           BUILD_DIR);
+  printf("%s\n", compile_cmd);
   system(compile_cmd);
 
   snprintf(compile_cmd, sizeof(compile_cmd),
-           "gcc -I. -I./lib -c %s -o %stest_file.o", test_file, BUILD_DIR);
+           "gcc  -I. -c %s -o %stest_file.o", test_file,
+           BUILD_DIR);
+  printf("%s\n", compile_cmd);
+
   system(compile_cmd);
 
   char object_files[1024] = "";
@@ -162,8 +168,11 @@ void compile_and_run(const char *test_file) {
   }
 
   snprintf(compile_cmd, sizeof(compile_cmd),
-           "gcc -I. -I./lib %stest_file.o %stest_assert.o %s %s -o %s", BUILD_DIR,
-           BUILD_DIR, object_files, RUNNER_FILENAME, RUNNER_EXECUTABLE);
+           "gcc -Wl,--defsym=main=test_main -I. %stest_file.o %stest_assert.o %s "
+           "%s -o %s",
+           BUILD_DIR, BUILD_DIR, object_files, RUNNER_FILENAME,
+           RUNNER_EXECUTABLE);
+  printf("%s\n", compile_cmd);
 
   if (system(compile_cmd) != 0) {
     fprintf(stderr, "Compilation failed\n");
@@ -171,6 +180,7 @@ void compile_and_run(const char *test_file) {
   }
 
   printf("Running tests in %s\n", test_file);
+  printf("./%s\n", RUNNER_EXECUTABLE);
   if (system("./" RUNNER_EXECUTABLE) != 0) {
     fprintf(stderr, "Tests failed\n");
     return;
@@ -182,7 +192,8 @@ int main(int argc, char *argv[]) {
   struct dirent *entry;
 
   if (argc < 2) {
-    fprintf(stderr, "Usage: export SRC_DIR in makefile that calls testify makefile\n");
+    fprintf(stderr,
+            "Usage: export SRC_DIR in makefile that calls testify makefile\n");
     exit(EXIT_FAILURE);
   }
   if ((dir = opendir(argv[1])) == NULL) {

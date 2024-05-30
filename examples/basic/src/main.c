@@ -1,7 +1,8 @@
 #include "../testify/test_assert.h"
+#include <stdio.h>
 
 int main() {
-
+    printf("DO NOT PRINT\n");
 }
 
 void testFunc() {
