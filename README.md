@@ -2,38 +2,6 @@
 
 Testify is a simple and effective C testing framework designed to help you manage and run tests with clear and concise reporting. This repository includes utilities for running tests on your C code, ensuring your assertions and test cases are handled efficiently.
 
-### File Descriptions
-
-- **test_assert.c**: Contains assertion functions used in your test cases.
-- **test_assert.h**: Header file for the assertion functions.
-- **test_runner.c**: Manages and runs the test cases, providing output for each test's success or failure.
-
-## Dependencies and Limitations
-
-### Dependencies
-
-- **Operating System:** The test runner currently works only on Linux distributions.
-- **Build System:** Make sure `make` is installed on your system. You can install it using your package manager, for example:
-  ```sh
-  sudo apt-get install make
-  ```
-- **Compiler:** The default compiler used is `gcc`. You can customize the compiler by modifying the macro DEFAULT COMPILER in the `test_runner.c` file.
-
-### Limitations
-
-- **Operating System:** The test runner does not currently support non-Linux operating systems, such as Windows or macOS.
-- **Single Compiler:** The repository is set up to use `gcc` by default. While it can be changed in the `test_runner.c` file by changing the DEFAULT COMPILER macro, there is no built-in support for other compilers out of the box.
-- **File Paths:** The test runner expects relative file paths for includes and source files. Absolute paths or non-standard directory structures may cause issues.
-- **Concurrency:** The test runner does not currently support running tests in parallel. Tests are executed sequentially.
-
-These dependencies and limitations should be considered when integrating testify into your project.
-
-## Example Output
-
-Here is an example of the output you can expect when running Testify:
-
-![Testify screenshot](https://github.com/conorgolden1/testify/blob/main/screenshots/output.png?raw=true)
-
 ## How to Use
 
 To integrate and use this test runner in your project, follow these steps:
@@ -60,6 +28,38 @@ To integrate and use this test runner in your project, follow these steps:
    ```sh
    make test
    ```
+## Example Output
+
+Here is an example of the output you can expect when running Testify:
+
+![Testify screenshot](https://github.com/conorgolden1/testify/blob/main/screenshots/output.png?raw=true)
+
+
+### File Descriptions
+
+- **test_assert.c**: Contains assertion functions used in your test cases.
+- **test_assert.h**: Header file for the assertion functions.
+- **test_runner.c**: Produces runner executables that will compile code with test functions and run the subsequent tests.
+
+## Dependencies and Limitations
+
+### Dependencies
+
+- **Operating System:** The test runner currently works only on Linux distributions.
+- **Build System:** Make sure `make` is installed on your system. You can install it using your package manager, for example:
+  ```sh
+  sudo apt-get install make
+  ```
+- **Compiler:** The default compiler used is `gcc`. You can customize the compiler by modifying the macro DEFAULT COMPILER in the `test_runner.c` file.
+
+### Limitations
+
+- **Operating System:** The test runner does not currently support non-Linux operating systems, such as Windows or macOS.
+- **Single Compiler:** The repository is set up to use `gcc` by default. While it can be changed in the `test_runner.c` file by changing the DEFAULT COMPILER macro, there is no built-in support for other compilers out of the box.
+- **File Paths:** The test runner expects relative file paths for includes and source files. Absolute paths or non-standard directory structures may cause issues.
+- **Concurrency:** The test runner does not currently support running tests in parallel. Tests are executed sequentially.
+
+These dependencies and limitations should be considered when integrating testify into your project.
 
 ### Example Project Structure
 
@@ -91,7 +91,7 @@ In this example, the `src` directory contains the source files and the `tests` d
 ### Additional Notes
 
 - **Test Directories:** Ensure that the `TEST_DIRS` variable in your Makefile includes all directories that contain test files.
-- **Customizing the Test Runner:** You can customize the test runner by modifying the files in the `testify` directory.
+- **Customizing the Test Runner:** You can customize the test runner by modifying any of the macros in the files in the `testify` directory.
 
 ## Contributing
 
