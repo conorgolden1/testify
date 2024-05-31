@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define SUCCESS "\033[1;32mSUCCESS\033[0m"
@@ -6,12 +7,22 @@
 #define RESET "\033[0m"
 #define MAX_OUTPUT_WIDTH 80
 
-extern int total_tests;
-extern int failed_tests;
-extern int test_assertions;
-extern int test_failures;
+int __test_runner__ = 0;
+static int total_tests = 0;
+static int failed_tests = 0;
+static int test_assertions = 0;
+static int test_failures = 0;
 
 void _assert(int condition, const char *caller_name, const char *file, int line) {
+    char message[256];
+    snprintf(message, sizeof(message), "%s (%s:%d)", caller_name, file, line);
+    if (!__test_runner__) {
+        if (!condition) {
+            printf("Assertion: %s (%s)\n" RESET, FAILED, message);
+            exit(1);
+        }
+        return;
+    }
     total_tests++;
     test_assertions++;
     if (!condition) {
@@ -20,8 +31,7 @@ void _assert(int condition, const char *caller_name, const char *file, int line)
     }
 
     // Prepare the initial part of the message
-    char message[256];
-    snprintf(message, sizeof(message), "%s (%s:%d)", caller_name, file, line);
+
 
     // Calculate the number of dots needed
     int message_length = strlen(message);

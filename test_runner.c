@@ -128,7 +128,6 @@ char *resolve_include_path(const char *base_path, const char *include_path) {
 void find_test_functions(const char *test_file,
                          char functions[MAX_FUNCTIONS][256],
                          int *num_functions) {
-  printf("Searching test functions:\t%s\n", test_file);
   FILE *file = fopen(test_file, "r");
   if (!file) {
     perror("fopen");
@@ -175,7 +174,7 @@ void find_includes(const char *test_file, char includes[MAX_FUNCTIONS][256],
   fclose(file);
 }
 
-void generate_runner(const char *test_file, char includes[MAX_FUNCTIONS][256],
+int generate_runner(const char *test_file, char includes[MAX_FUNCTIONS][256],
                      int num_includes) {
   FILE *runner = fopen(BUILD_DIR RUNNER_FILENAME, "w");
   if (runner == NULL) {
@@ -186,43 +185,34 @@ void generate_runner(const char *test_file, char includes[MAX_FUNCTIONS][256],
   char functions[MAX_FUNCTIONS][256];
   int num_functions;
   find_test_functions(test_file, functions, &num_functions);
-
+  if (num_functions == 0) {
+    return num_functions;
+  }
   fprintf(runner, "#include <stdio.h>\n");
   for (int i = 0; i < num_includes; i++) {
     char *path = resolve_include_path(test_file, includes[i]);
     fprintf(runner, "#include \"../../%s\n", path);
     free(path);
   }
-  fprintf(runner, "int test_assertions = 0;\n");
-  fprintf(runner, "int test_failures = 0;\n");
-  fprintf(runner, "int total_tests = 0;\n");
-  fprintf(runner, "int failed_tests = 0;\n\n");
+  fprintf(runner, "extern int __test_runner__;\n");
 
   fprintf(runner, "void run_all_tests() {\n");
-  fprintf(runner, "    #pragma GCC diagnostic push\n");
-  fprintf(runner, "    #pragma GCC diagnostic ignored "
-                  "\"-Wimplicit-function-declaration\"\n");
   for (int i = 0; i < num_functions; i++) {
     fprintf(runner, "    _start_test(\"%s\");\n", functions[i]);
     fprintf(runner, "    %s();\n", functions[i]);
     fprintf(runner, "    _end_test(\"%s\");\n", functions[i]);
   }
-
-  fprintf(runner, "    #pragma GCC diagnostic pop\n");
   fprintf(runner, "}\n\n");
 
   fprintf(runner, "int test_main() {\n");
-  /* line where GCC complains about implicit function declaration */
+  fprintf(runner, "    __test_runner__ = 1;\n");
+   /* line where GCC complains about implicit function declaration */
   fprintf(runner, "    run_all_tests();\n");
-  fprintf(runner, "    #pragma GCC diagnostic push\n");
-  fprintf(runner, "    #pragma GCC diagnostic ignored "
-                  "\"-Wimplicit-function-declaration\"\n");
-  fprintf(runner, "    _print_test_summary();\n");
-  fprintf(runner, "    #pragma GCC diagnostic pop\n");
   fprintf(runner, "    return 0;\n");
   fprintf(runner, "}\n");
 
   fclose(runner);
+  return num_functions;
 }
 
 void compile_and_run(const char *test_file, char includes[MAX_FUNCTIONS][256],
@@ -242,17 +232,17 @@ void compile_and_run(const char *test_file, char includes[MAX_FUNCTIONS][256],
   }
 
   // Write the initial part of the Makefile
-  fprintf(makefile, "CC=%s\nCFLAGS=-Wall -Wextra -std=c11\n\n");
+  fprintf(makefile, "CC=%s\nCFLAGS=-w -std=c11\n\n",
+          DEFAULT_COMPILER);
   fprintf(makefile, "all:\n");
-  fprintf(makefile, "\t@pwd\n");
   // Compile the included files
   for (int i = 0; i < num_includes; i++) {
     char *path = resolve_include_path(test_file, includes[i]);
     char *no_ext = remove_extension(path);
     char *filename = get_filename_without_extension(path);
 
-    snprintf(compile_cmd, sizeof(compile_cmd), "\t$(CC) -c ../../%s.c -o %s.o\n",
-             no_ext,  filename);
+    snprintf(compile_cmd, sizeof(compile_cmd),
+             "\t$(CC) $(CFLAGS) -c ../../%s.c -o %s.o\n", no_ext, filename);
     fprintf(makefile, "%s", compile_cmd);
     snprintf(compile_cmd, sizeof(compile_cmd), "%s.o ", filename);
     strcat(object_files, compile_cmd);
@@ -263,8 +253,8 @@ void compile_and_run(const char *test_file, char includes[MAX_FUNCTIONS][256],
   }
 
   // Compile the test file
-  snprintf(compile_cmd, sizeof(compile_cmd), "\t$(CC) -c ../../%s -o test_file.o\n",
-           test_file);
+  snprintf(compile_cmd, sizeof(compile_cmd),
+           "\t$(CC) $(CFLAGS) -c ../../%s -o test_file.o\n", test_file);
   fprintf(makefile, "%s", compile_cmd);
   strcat(object_files, "test_file.o ");
 
@@ -286,7 +276,7 @@ void compile_and_run(const char *test_file, char includes[MAX_FUNCTIONS][256],
 
   // Link all the object files
   snprintf(compile_cmd, sizeof(compile_cmd),
-           "\t$(CC) -Wl,--defsym=main=test_main  %s %s -o %s\n", object_files,
+           "\t$(CC) $(CFLAGS) -Wl,--defsym=main=test_main  %s %s -o %s\n", object_files,
            RUNNER_FILENAME, RUNNER_EXECUTABLE);
   fprintf(makefile, "%s", compile_cmd);
 
@@ -333,7 +323,9 @@ int main(int argc, char *argv[]) {
         char includes[MAX_FUNCTIONS][256];
         int num_includes;
         find_includes(test_file_path, includes, &num_includes);
-        generate_runner(test_file_path, includes, num_includes);
+        if (generate_runner(test_file_path, includes, num_includes) == 0) {
+            continue;
+        }
         compile_and_run(test_file_path, includes, num_includes);
       }
     }
