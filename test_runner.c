@@ -16,6 +16,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#define DEFAULT_COMPILER "gcc"
 #define BUILD_LIB_DIR "build/lib"
 #define BUILD_DIR "build/tests/"
 #define TEST_PREFIX ""
@@ -241,7 +242,7 @@ void compile_and_run(const char *test_file, char includes[MAX_FUNCTIONS][256],
   }
 
   // Write the initial part of the Makefile
-  fprintf(makefile, "CC=gcc\nCFLAGS=-Wall -Wextra -std=c11\n\n");
+  fprintf(makefile, "CC=%s\nCFLAGS=-Wall -Wextra -std=c11\n\n");
   fprintf(makefile, "all:\n");
   fprintf(makefile, "\t@pwd\n");
   // Compile the included files
@@ -303,17 +304,8 @@ void compile_and_run(const char *test_file, char includes[MAX_FUNCTIONS][256],
     fprintf(stderr, "Compilation failed\n");
     return;
   }
-
-  // // Run the tests
-  // char runner_command[512];
-  // snprintf(runner_command, sizeof(runner_command), "./%s%s", BUILD_DIR,
-  // RUNNER_EXECUTABLE); printf("Running tests in %s\n", test_file);
-  // printf("%s\n", runner_command);
-  // if (system(runner_command) != 0) {
-  //     fprintf(stderr, "Tests failed\n");
-  //     return;
-  // }
 }
+
 int main(int argc, char *argv[]) {
   DIR *dir;
   struct dirent *entry;

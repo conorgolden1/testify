@@ -17,12 +17,12 @@ Testify is a simple and effective C testing framework designed to help you manag
   ```sh
   sudo apt-get install make
   ```
-- **Compiler:** The default compiler used is `gcc`. You can customize the compiler by modifying the `test_runner.c` file.
+- **Compiler:** The default compiler used is `gcc`. You can customize the compiler by modifying the macro DEFAULT COMPILER in the `test_runner.c` file.
 
 ### Limitations
 
 - **Operating System:** The test runner does not currently support non-Linux operating systems, such as Windows or macOS.
-- **Single Compiler:** The repository is set up to use `gcc` by default. While it can be changed in the `test_runner.c` file, there is no built-in support for other compilers out of the box.
+- **Single Compiler:** The repository is set up to use `gcc` by default. While it can be changed in the `test_runner.c` file by changing the DEFAULT COMPILER macro, there is no built-in support for other compilers out of the box.
 - **File Paths:** The test runner expects relative file paths for includes and source files. Absolute paths or non-standard directory structures may cause issues.
 - **Concurrency:** The test runner does not currently support running tests in parallel. Tests are executed sequentially.
 
